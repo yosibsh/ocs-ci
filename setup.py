@@ -48,6 +48,7 @@ setup(
         'elasticsearch',
         'numpy',
         'python-ipmi',
+        'PrettyTable'
     ],
     entry_points={
         'console_scripts': [
