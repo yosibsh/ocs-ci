@@ -6,12 +6,12 @@ import datetime
 import hashlib
 import json
 import logging
-import os
 import re
 import statistics
 import tempfile
 import threading
 import time
+import csv
 from concurrent.futures import ThreadPoolExecutor
 from subprocess import PIPE, TimeoutExpired, run
 from uuid import uuid4
@@ -2361,6 +2361,7 @@ def get_pv_size(storageclass=None):
     Returns:
         list: list of pv's size
 
+
     """
     return_list = []
 
@@ -2370,3 +2371,33 @@ def get_pv_size(storageclass=None):
         if pv_obj['spec']['storageClassName'] == storageclass:
             return_list.append(pv_obj['spec']['capacity']['storage'])
     return return_list
+
+def delete_objs(obj_list):
+    """
+    Delete elements in a list of objects
+    Args:
+        obj_list (list): objects to delete
+    """
+    for obj in obj_list:
+        obj.delete()
+    # all the deletes are happening without waiting.  Now wait for all to be done.
+    for obj in obj_list:
+        obj.ocp.wait_for_delete(obj.name)
+
+# TODO: Update below code with google API, to record value in spreadsheet
+# TODO: For now observing Google API limit to write more than 100 writes
+def write_csv_data(data_to_write, csv_file, adjective):
+    """
+    Write csv data to a file
+    Args:
+        data_to_write (dict): input data
+        csv_file (str): name of file to be written
+        adjective (str): text added to log message
+    """
+    with open(csv_file, "w") as fd:
+        csv_obj = csv.writer(fd)
+        for k, v in data_to_write.items():
+            csv_obj.writerow([k, v])
+    logger.info(
+        f"{adjective} data present in {csv_file}"
+    )
