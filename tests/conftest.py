@@ -2002,8 +2002,8 @@ def multiregion_resources_fixture(request, mcg_obj):
 
     # Cleans up all resources that were created for the test
     def resource_cleanup():
-        for resource in chain(bs_secrets, bucketclasses):
-            resource.delete()
+        for bc in bucketclasses:
+            bc.delete()
 
         for backingstore in bs_objs:
             backingstore.delete()
@@ -2012,6 +2012,9 @@ def multiregion_resources_fixture(request, mcg_obj):
                 'delete_pool',
                 {'name': backingstore.name}
             )
+
+        for secret in bs_secrets:
+            secret.delete()
 
         for aws_bucket_name in aws_buckets:
             mcg_obj.toggle_aws_bucket_readwrite(aws_bucket_name, block=False)
