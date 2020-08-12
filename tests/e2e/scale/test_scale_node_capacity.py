@@ -110,12 +110,12 @@ class TestAddNode(E2ETest):
         # add_capacity_test(count=2)
 
         # while True:
-        # Scale 3 OCS worker and add full capacity
-        add_ocs_node(3)
-        add_capacity_test(count=3)
-
-        # if helpers.get_worker_nodes() == 30:
-        #     break
+        #     # Scale 3 OCS worker and add full capacity
+        #     add_ocs_node(3)
+        #     add_capacity_test(count=3)
+        #
+        #     if helpers.get_worker_nodes() == 30:
+        #         break
 
         iteration_count = 0
         while True:
