@@ -2,6 +2,7 @@
 import argparse
 import base64
 import binascii
+import json
 import os
 import yaml
 
@@ -65,9 +66,14 @@ def write_aws_creds():
         conf.write(conf_file)
 
 
+def create_data_dir():
+    data_dir = os.path.join(env['WORKSPACE'], 'data')
+    os.makedirs(data_dir, exist_ok=True)
+    return data_dir
+
+
 def write_pull_secret():
-    secret_dir = os.path.join(env['WORKSPACE'], 'data')
-    os.makedirs(secret_dir, exist_ok=True)
+    data_dir = create_data_dir()
     secret = env['PULL_SECRET']
     # In Jenkins, this is a JSON string. In GitLab CI, the JSON will be
     # base64-encoded.
@@ -75,8 +81,16 @@ def write_pull_secret():
         secret = base64.b64decode(secret).decode()
     except (binascii.Error, UnicodeDecodeError):
         pass
-    with open(os.path.join(secret_dir, 'pull-secret'), 'w') as secret_file:
+    with open(os.path.join(data_dir, 'pull-secret'), 'w') as secret_file:
         secret_file.write(secret)
+    write_auth_yaml(data_dir, json.loads(secret))
+
+
+def write_auth_yaml(data_dir, pull_secret, token_name='quay.io/rhceph-dev'):
+    quay_token = pull_secret['auths'][token_name]
+    auth_obj = dict(quay=dict(access_token=quay_token))
+    with open(os.path.join(data_dir, 'auth.yaml'), 'w') as auth_file:
+        auth_file.write(yaml.safe_dump(auth_obj))
 
 
 def get_ocsci_conf():
