@@ -4,9 +4,8 @@ import threading
 
 from tests import helpers
 from ocs_ci.ocs.ocp import OCP
-from ocs_ci.ocs import constants, scale_lib
+from ocs_ci.ocs import constants
 from ocs_ci.framework import config
-from ocs_ci.ocs.cluster import CephCluster
 from ocs_ci.ocs.scale_lib import FioPodScale
 from ocs_ci.ocs import machine as machine_utils
 from ocs_ci.ocs.resources import storage_cluster
@@ -92,10 +91,6 @@ def add_capacity_test(count=1):
     ceph_health_check(
         namespace=config.ENV_DATA['cluster_namespace'], tries=80
     )
-    # ceph_cluster_obj = CephCluster()
-    # assert ceph_cluster_obj.wait_for_rebalance(timeout=3600), (
-    #     "Data re-balance failed to complete"
-    # )
 
 
 @ignore_leftovers
@@ -112,48 +107,48 @@ class TestAddNode(E2ETest):
         Test for adding worker nodes to the cluster while IOs
         """
         # Scale OCS worker node
-        add_capacity_test(count=2)
+        # add_capacity_test(count=2)
 
-        while True:
-            # Scale 3 OCS worker and add full capacity
-            add_ocs_node(3)
-            add_capacity_test(count=3)
-
-            if helpers.get_worker_nodes() == 30:
-                break
-
-        # iteration_count = 0
         # while True:
-        #     # Scale PVC+POD to reach 15000 required 120 app worker nodes.
-        #     # Scale FIO pods in the cluster
-        #     # Single iteration will create 1500 pods.
-        #     iteration_count += 1
-        #     nginx_pod = FioPodScale(
-        #         kind=constants.POD, pod_dict_path=constants.NGINX_POD_YAML,
-        #         node_selector=constants.SCALE_NODE_SELECTOR
-        #     )
-        #     fedora_pod = FioPodScale(
-        #         kind=constants.DEPLOYMENTCONFIG, pod_dict_path=constants.FEDORA_DC_YAML,
-        #         node_selector=constants.SCALE_NODE_SELECTOR
-        #     )
-        #
-        #     nginx_pod.create_scale_pods(
-        #         scale_count=400, pods_per_iter=10, io_runtime=36000,
-        #         start_io=True
-        #     )
-        #
-        #     nginx_pod.create_scale_pods(
-        #         scale_count=400, pods_per_iter=5, start_io=False
-        #     )
-        #
-        #     fedora_pod.create_scale_pods(
-        #         scale_count=350, pods_per_iter=5, io_runtime=36000,
-        #         start_io=True
-        #     )
-        #
-        #     fedora_pod.create_scale_pods(
-        #         scale_count=350, pods_per_iter=5, start_io=False
-        #     )
-        #
-        #     if iteration_count >= 10:
-        #         break
+        # Scale 3 OCS worker and add full capacity
+        add_ocs_node(3)
+        add_capacity_test(count=3)
+
+        # if helpers.get_worker_nodes() == 30:
+        #     break
+
+        iteration_count = 0
+        while True:
+            # Scale PVC+POD to reach 15000 required 120 app worker nodes.
+            # Scale FIO pods in the cluster
+            # Single iteration will create 1500 pods.
+            iteration_count += 1
+            nginx_pod = FioPodScale(
+                kind=constants.POD, pod_dict_path=constants.NGINX_POD_YAML,
+                node_selector=constants.SCALE_NODE_SELECTOR
+            )
+            fedora_pod = FioPodScale(
+                kind=constants.DEPLOYMENTCONFIG, pod_dict_path=constants.FEDORA_DC_YAML,
+                node_selector=constants.SCALE_NODE_SELECTOR
+            )
+
+            nginx_pod.create_scale_pods(
+                scale_count=400, pods_per_iter=10, io_runtime=36000,
+                start_io=True
+            )
+
+            nginx_pod.create_scale_pods(
+                scale_count=400, pods_per_iter=10, start_io=False
+            )
+
+            fedora_pod.create_scale_pods(
+                scale_count=350, pods_per_iter=10, io_runtime=36000,
+                start_io=True
+            )
+
+            fedora_pod.create_scale_pods(
+                scale_count=350, pods_per_iter=10, start_io=False
+            )
+
+            if iteration_count >= 10:
+                break
