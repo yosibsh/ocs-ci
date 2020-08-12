@@ -20,7 +20,7 @@ class FioPodScale(object):
     FioPodScale Class with required scale library functions and params
     """
     def __init__(
-        self, kind='deploymentconfig', pod_dict_path=constants.FEDORA_DC_YAML,
+        self, kind=constants.DEPLOYMENTCONFIG, pod_dict_path=constants.FEDORA_DC_YAML,
         node_selector=constants.SCALE_NODE_SELECTOR
     ):
         """
@@ -55,7 +55,7 @@ class FioPodScale(object):
         """
         Set dc_deployment True or False based on Kind
         """
-        self.dc_deployment = True if self.kind == 'deploymentconfig' else False
+        self.dc_deployment = True if self.kind == constants.DEPLOYMENTCONFIG else False
 
     def create_and_set_namespace(self):
         """
@@ -74,8 +74,8 @@ class FioPodScale(object):
             self.sa_name = None
 
     def create_multi_pvc_pod(
-        self, pods_per_iter=5, io_runtime=3600, start_io=False,
-        pvc_size=None
+        self, namespace, pods_per_iter=5, io_runtime=3600, start_io=False,
+        pvc_size=None, sa_name=None
     ):
         """
         Function to create PVC of different type and attach them to PODs and start IO.
@@ -86,6 +86,7 @@ class FioPodScale(object):
             io_runtime (sec): Fio run time in seconds
             start_io (bool): If True start IO else don't
             pvc_size (Gi): size of PVC
+            ns
 
         Returns:
             pod_objs (obj): Objs of all the PODs created
@@ -95,16 +96,18 @@ class FioPodScale(object):
         rbd_sc = helpers.default_storage_class(constants.CEPHBLOCKPOOL)
         cephfs_sc = helpers.default_storage_class(constants.CEPHFILESYSTEM)
         pvc_size = pvc_size or f"{random.randrange(15, 105, 5)}Gi"
-        fio_size = get_size_based_on_cls_usage()
-        fio_rate = get_rate_based_on_cls_iops()
+        # fio_size = get_size_based_on_cls_usage()
+        # fio_rate = get_rate_based_on_cls_iops()
+        fio_size = '128M'
+        fio_rate = '4k'
         logging.info(f"Create {pods_per_iter * 4} PVCs and PODs")
         # Create PVCs
         cephfs_pvcs = helpers.create_multiple_pvc_parallel(
-            sc_obj=cephfs_sc, namespace=self.namespace, number_of_pvc=pods_per_iter,
+            sc_obj=cephfs_sc, namespace=namespace, number_of_pvc=pods_per_iter,
             size=pvc_size, access_modes=[constants.ACCESS_MODE_RWO, constants.ACCESS_MODE_RWX]
         )
         rbd_pvcs = helpers.create_multiple_pvc_parallel(
-            sc_obj=rbd_sc, namespace=self.namespace, number_of_pvc=pods_per_iter,
+            sc_obj=rbd_sc, namespace=namespace, number_of_pvc=pods_per_iter,
             size=pvc_size, access_modes=[constants.ACCESS_MODE_RWO, constants.ACCESS_MODE_RWX]
         )
 
@@ -114,8 +117,8 @@ class FioPodScale(object):
 
         # Create pods with above pvc list
         cephfs_pods = helpers.create_pods_parallel(
-            cephfs_pvcs, self.namespace, constants.CEPHFS_INTERFACE,
-            pod_dict_path=self.pod_dict_path, sa_name=self.sa_name,
+            cephfs_pvcs, namespace, constants.CEPHFS_INTERFACE,
+            pod_dict_path=self.pod_dict_path, sa_name=sa_name,
             dc_deployment=self.dc_deployment, node_selector=self.node_selector
         )
         rbd_rwo_pvc, rbd_rwx_pvc = ([] for i in range(2))
@@ -125,13 +128,13 @@ class FioPodScale(object):
             else:
                 rbd_rwo_pvc.append(pvc_obj)
         rbd_rwo_pods = helpers.create_pods_parallel(
-            rbd_rwo_pvc, self.namespace, constants.CEPHBLOCKPOOL,
-            pod_dict_path=self.pod_dict_path, sa_name=self.sa_name,
+            rbd_rwo_pvc, namespace, constants.CEPHBLOCKPOOL,
+            pod_dict_path=self.pod_dict_path, sa_name=sa_name,
             dc_deployment=self.dc_deployment, node_selector=self.node_selector
         )
         rbd_rwx_pods = helpers.create_pods_parallel(
-            rbd_rwx_pvc, self.namespace, constants.CEPHBLOCKPOOL,
-            pod_dict_path=self.pod_dict_path, sa_name=self.sa_name,
+            rbd_rwx_pvc, namespace, constants.CEPHBLOCKPOOL,
+            pod_dict_path=self.pod_dict_path, sa_name=sa_name,
             dc_deployment=self.dc_deployment, raw_block_pv=True,
             node_selector=self.node_selector
         )
@@ -154,7 +157,7 @@ class FioPodScale(object):
                 )
                 process.start()
                 threads.append(process)
-                time.sleep(30)
+                time.sleep(2)
             for pod_obj in rbd_rwx_pods:
                 process = threading.Thread(
                     target=pod_obj.run_io, kwargs={
@@ -164,7 +167,7 @@ class FioPodScale(object):
                 )
                 process.start()
                 threads.append(process)
-                time.sleep(30)
+                time.sleep(2)
             for process in threads:
                 process.join()
 
@@ -210,16 +213,16 @@ class FioPodScale(object):
             if scale_count <= len(all_pod_obj):
                 logger.info(f"Scaled {scale_count} pvc and pods")
 
-                if cluster.validate_pg_balancer():
-                    logging.info("OSD consumption and PG distribution is good to continue")
-                else:
-                    raise UnexpectedBehaviour("Unequal PG distribution to OSDs")
+                # if cluster.validate_pg_balancer():
+                #     logging.info("OSD consumption and PG distribution is good to continue")
+                # else:
+                #     raise UnexpectedBehaviour("Unequal PG distribution to OSDs")
 
                 break
             else:
                 logger.info(f"Scaled PVC and POD count {len(all_pod_obj)}")
                 self.pod_obj, self.pvc_obj = self.create_multi_pvc_pod(
-                    pods_per_iter, io_runtime, start_io, pvc_size
+                    self.namespace, pods_per_iter, io_runtime, start_io, pvc_size, sa_name=self.sa_name
                 )
                 all_pod_obj.extend(self.pod_obj)
                 try:
@@ -227,12 +230,12 @@ class FioPodScale(object):
                     check_enough_resource_available_in_workers(self.ms_name, self.pod_dict_path)
 
                     # Check for ceph cluster OSD utilization
-                    if not cluster.validate_osd_utilization(osd_used=75):
-                        logging.info("Cluster OSD utilization is below 75%")
-                    elif not cluster.validate_osd_utilization(osd_used=83):
-                        logger.warning("Cluster OSD utilization is above 75%")
-                    else:
-                        raise CephHealthException("Cluster OSDs are near full")
+                    # if not cluster.validate_osd_utilization(osd_used=75):
+                    #     logging.info("Cluster OSD utilization is below 75%")
+                    # elif not cluster.validate_osd_utilization(osd_used=83):
+                    #     logger.warning("Cluster OSD utilization is above 75%")
+                    # else:
+                    #     raise CephHealthException("Cluster OSDs are near full")
 
                     # Check for 500 pods per namespace
                     pod_objs = pod.get_all_pods(namespace=self.namespace_list[-1].namespace)
