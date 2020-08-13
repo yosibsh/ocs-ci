@@ -1,6 +1,7 @@
 import logging
 import threading
 import random
+import time
 
 from tests import helpers
 from ocs_ci.ocs.ocp import OCP
@@ -74,7 +75,7 @@ class FioPodScale(object):
             self.sa_name = None
 
     def create_multi_pvc_pod(
-        self, namespace, pods_per_iter=5, io_runtime=3600, start_io=False,
+        self, namespace, pods_per_iter=5, io_runtime=300, start_io=False,
         pvc_size=None, sa_name=None
     ):
         """
@@ -106,6 +107,7 @@ class FioPodScale(object):
             sc_obj=cephfs_sc, namespace=namespace, number_of_pvc=pods_per_iter,
             size=pvc_size, access_modes=[constants.ACCESS_MODE_RWO, constants.ACCESS_MODE_RWX]
         )
+        time.sleep(5)
         rbd_pvcs = helpers.create_multiple_pvc_parallel(
             sc_obj=rbd_sc, namespace=namespace, number_of_pvc=pods_per_iter,
             size=pvc_size, access_modes=[constants.ACCESS_MODE_RWO, constants.ACCESS_MODE_RWX]
@@ -145,7 +147,6 @@ class FioPodScale(object):
         pod_objs.extend(temp_pod_objs + rbd_rwx_pods)
 
         # Start IO
-        import time
         if start_io:
             threads = list()
             for pod_obj in temp_pod_objs:
@@ -227,7 +228,7 @@ class FioPodScale(object):
                 all_pod_obj.extend(self.pod_obj)
                 try:
                     # Check enough resources available in the dedicated app workers
-                    check_enough_resource_available_in_workers(self.ms_name, self.pod_dict_path)
+                    # check_enough_resource_available_in_workers(self.ms_name, self.pod_dict_path)
 
                     # Check for ceph cluster OSD utilization
                     # if not cluster.validate_osd_utilization(osd_used=75):

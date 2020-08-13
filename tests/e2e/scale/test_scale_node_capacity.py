@@ -133,8 +133,7 @@ class TestAddNode(E2ETest):
             )
 
             nginx_pod.create_scale_pods(
-                scale_count=400, pods_per_iter=10, io_runtime=36000,
-                start_io=True
+                scale_count=400, pods_per_iter=10, start_io=True
             )
 
             nginx_pod.create_scale_pods(

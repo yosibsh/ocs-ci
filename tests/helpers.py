@@ -1750,7 +1750,7 @@ def create_multiple_pvc_parallel(
     with ThreadPoolExecutor() as executor:
         for objs in pvc_objs_list:
             obj_status_list.append(
-                executor.submit(wait_for_resource_state, objs, 'Bound', 90)
+                executor.submit(wait_for_resource_state, objs, 'Bound', 120)
             )
     if False in [obj.result() for obj in obj_status_list]:
         raise TimeoutExpiredError
