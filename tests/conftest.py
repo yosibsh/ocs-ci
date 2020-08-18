@@ -74,6 +74,7 @@ from ocs_ci.ocs.amq import AMQ
 
 log = logging.getLogger(__name__)
 
+pytest_plugins = ['pytest_profiling'] #py-test profiling
 
 class OCSLogFormatter(logging.Formatter):
 
