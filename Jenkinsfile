@@ -102,7 +102,7 @@ pipeline {
   }
   post {
     always {
-      archiveArtifacts artifacts: 'ocs-ci-*.yaml,cluster/**,logs/**', fingerprint: true
+      archiveArtifacts artifacts: 'ocs-ci-*.yaml,cluster/**,logs/**,prof/**', fingerprint: true
       script {
         if( env.DEBUG_CLUSTER in [true, 'true'] ) {
           input(message: "Proceed with cluster teardown?")
