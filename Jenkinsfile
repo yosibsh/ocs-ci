@@ -91,17 +91,11 @@ pipeline {
       }
     }
     stage("Run Tests") {
-      environment {
-        EMAIL_ARG = """${sh(
-          returnStdout: true,
-          script: "if [ ! -z '${env.EMAIL}' -a -z '${TEST_SUITE}' ]; then echo -n '--email=${env.EMAIL}'; fi"
-        )}"""
-      }
       steps {
         script { LAST_STAGE=env.STAGE_NAME }
         sh """
         source ./venv/bin/activate
-        run-ci -m ${TEST_SUITE} --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --self-contained-html --html=${env.WORKSPACE}/logs/report.html --junit-xml=${env.WORKSPACE}/logs/junit.xml --collect-logs --bugzilla ${env.EMAIL_ARG}
+        run-ci -m ${TEST_SUITE} --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --self-contained-html --html=${env.WORKSPACE}/logs/report.html --junit-xml=${env.WORKSPACE}/logs/junit.xml --collect-logs --bugzilla ${env.EMAIL ? '--email ' + env.EMAIL : ''}
         """
       }
     }
