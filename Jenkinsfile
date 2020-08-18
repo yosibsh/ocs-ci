@@ -16,6 +16,9 @@
 //   EMAIL
 //   UMB_MESSAGE
 //   DEBUG_CLUSTER
+// Finally, it may optionally take a TEST_SUITE argument specifying which
+// marks to use for py.test tests; if unset, defaults to 'acceptance'. If set,
+// these behaviors will be skipped: emailing, tagging, UMB message sending.
 def LAST_STAGE
 
 pipeline {
@@ -27,6 +30,7 @@ pipeline {
     AWS_SECRET_ACCESS_KEY = credentials("openshift-dev-aws-secret-access-key-${env.CLUSTER_USER}")
     PULL_SECRET = credentials('openshift-pull-secret')
     BUGZILLA_CFG = credentials('ocs-bugzilla-cfg')
+    TEST_SUITE = "${env.TEST_SUITE ?: 'acceptance'}"
   }
   stages {
     stage("Setup") {
@@ -86,18 +90,18 @@ pipeline {
         """
       }
     }
-    stage("Acceptance Tests") {
+    stage("Run Tests") {
       environment {
         EMAIL_ARG = """${sh(
           returnStdout: true,
-          script: "if [ ! -z '${env.EMAIL}' ]; then echo -n '--email=${env.EMAIL}'; fi"
+          script: "if [ ! -z '${env.EMAIL}' -a -z '${TEST_SUITE}' ]; then echo -n '--email=${env.EMAIL}'; fi"
         )}"""
       }
       steps {
         script { LAST_STAGE=env.STAGE_NAME }
         sh """
         source ./venv/bin/activate
-        run-ci -m acceptance --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --self-contained-html --html=${env.WORKSPACE}/logs/report.html --junit-xml=${env.WORKSPACE}/logs/junit.xml --collect-logs --bugzilla ${env.EMAIL_ARG}
+        run-ci -m ${TEST_SUITE} --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --self-contained-html --html=${env.WORKSPACE}/logs/report.html --junit-xml=${env.WORKSPACE}/logs/junit.xml --collect-logs --bugzilla ${env.EMAIL_ARG}
         """
       }
     }
@@ -118,7 +122,7 @@ pipeline {
     }
     failure {
       script {
-        if ( LAST_STAGE != "Acceptance Tests" ) {
+        if ( TEST_SUITE == 'acceptance' && LAST_STAGE != "Run Tests" ) {
           emailext (
             subject: "Job '${env.JOB_NAME}' build #${env.BUILD_ID} failed during stage '${LAST_STAGE}'",
             body: "Build failed : ${env.BUILD_URL}",
@@ -130,47 +134,49 @@ pipeline {
     }
     success {
       script {
-        def registry_image = "${env.OCS_REGISTRY_IMAGE}"
-        // quay.io/rhceph-dev/ocs-registry:4.2.2-255.ci -> 4.2.2-255.ci
-        def registry_tag = registry_image.split(':')[-1]
-        def ocs_version = registry_tag.split('-')[0]
-        // ocs version with only X.Y
-        def short_ocs_version = ocs_version.tokenize(".").take(2).join(".")
-        if (short_ocs_version.toFloat() < 4.5 ) {
-          // tag ocs-olm-operator container because versions < 4.5 use olm registry containers
-          build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-olm-operator:latest-stable-${ocs_version}")]
-          build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-olm-operator:latest-stable-${short_ocs_version}")]
-        }
-        else {
-          // tag ocs-bundle-operator and ocs-registry container because versions > 4.5 use bundle index containers
-          build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-bundle-operator:latest-stable-${ocs_version}")]
-          build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-bundle-operator:latest-stable-${short_ocs_version}")]
-          build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-registry:latest-stable-${ocs_version}")]
-          build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-registry:latest-stable-${short_ocs_version}")]
-        }
-        if( env.UMB_MESSAGE in [true, 'true'] ) {
-          def registry_version = registry_tag.split('-')[0]
-          def properties = """
-            TOOL=ocs-ci
-            PRODUCT=ocs
-            PRODUCT_VERSION=${registry_version}
-          """
-          def content_string = """{
-            "SENDER_BUILD_NUMBER": "${BUILD_NUMBER}",
-            "OCS_REGISTRY_IMAGE": "${env.OCS_REGISTRY_IMAGE}",
-          }"""
-          def content = readJSON text: content_string
-          echo "Sending UMB message"
-          echo 'Properties: ' + properties
-          echo 'Content: ' + content.toString()
-          sendCIMessage (
-            providerName: 'Red Hat UMB',
-            overrides: [ topic: 'VirtualTopic.qe.ci.jenkins' ],
-            failOnError: false,
-            messageType: 'ProductAcceptedForReleaseTesting',
-            messageProperties: properties,
-            messageContent: content.toString()
-          )
+        if ( TEST_SUITE == 'acceptance' ) {
+          def registry_image = "${env.OCS_REGISTRY_IMAGE}"
+          // quay.io/rhceph-dev/ocs-registry:4.2.2-255.ci -> 4.2.2-255.ci
+          def registry_tag = registry_image.split(':')[-1]
+          def ocs_version = registry_tag.split('-')[0]
+          // ocs version with only X.Y
+          def short_ocs_version = ocs_version.tokenize(".").take(2).join(".")
+          if (short_ocs_version.toFloat() < 4.5 ) {
+            // tag ocs-olm-operator container because versions < 4.5 use olm registry containers
+            build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-olm-operator:latest-stable-${ocs_version}")]
+            build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-olm-operator:latest-stable-${short_ocs_version}")]
+          }
+          else {
+            // tag ocs-bundle-operator and ocs-registry container because versions > 4.5 use bundle index containers
+            build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-bundle-operator:latest-stable-${ocs_version}")]
+            build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-bundle-operator:latest-stable-${short_ocs_version}")]
+            build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-registry:latest-stable-${ocs_version}")]
+            build job: 'quay-tag-image', parameters: [string(name: "SOURCE_URL", value: "${registry_image}"), string(name: "QUAY_IMAGE_TAG", value: "ocs-registry:latest-stable-${short_ocs_version}")]
+          }
+          if( env.UMB_MESSAGE in [true, 'true'] ) {
+            def registry_version = registry_tag.split('-')[0]
+            def properties = """
+              TOOL=ocs-ci
+              PRODUCT=ocs
+              PRODUCT_VERSION=${registry_version}
+            """
+            def content_string = """{
+              "SENDER_BUILD_NUMBER": "${BUILD_NUMBER}",
+              "OCS_REGISTRY_IMAGE": "${env.OCS_REGISTRY_IMAGE}",
+            }"""
+            def content = readJSON text: content_string
+            echo "Sending UMB message"
+            echo 'Properties: ' + properties
+            echo 'Content: ' + content.toString()
+            sendCIMessage (
+              providerName: 'Red Hat UMB',
+              overrides: [ topic: 'VirtualTopic.qe.ci.jenkins' ],
+              failOnError: false,
+              messageType: 'ProductAcceptedForReleaseTesting',
+              messageProperties: properties,
+              messageContent: content.toString()
+            )
+          }
         }
       }
     }
