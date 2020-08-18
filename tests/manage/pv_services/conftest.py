@@ -6,6 +6,7 @@ from ocs_ci.ocs.resources import pod
 
 log = logging.getLogger(__name__)
 
+pytest_plugins = ['pytest_profiling'] #py-test profiling
 
 @pytest.fixture()
 def create_pvcs_and_pods(
