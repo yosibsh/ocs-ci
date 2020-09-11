@@ -77,6 +77,7 @@ STATUS_RELEASED = 'Released'
 STATUS_COMPLETED = 'Completed'
 STATUS_ERROR = 'Error'
 STATUS_CLBO = 'CrashLoopBackOff'
+STATUS_READYTOUSE = 'READYTOUSE'
 
 # NooBaa statuses
 BS_AUTH_FAILED = 'AUTH_FAILED'
@@ -110,6 +111,7 @@ JOB = 'job'
 LOCAL_VOLUME = 'localvolume'
 PROXY = 'Proxy'
 MACHINECONFIGPOOL = "MachineConfigPool"
+VOLUMESNAPSHOTCLASS = "VolumeSnapshotClass"
 
 # Provisioners
 AWS_EFS_PROVISIONER = "openshift.org/aws-efs"
@@ -198,6 +200,12 @@ DEFAULT_EXTERNAL_MODE_STORAGECLASS_RBD = (
     f'{DEFAULT_CLUSTERNAME_EXTERNAL_MODE}-ceph-rbd'
 )
 
+# Default VolumeSnapshotClass
+DEFAULT_VOLUMESNAPSHOTCLASS_CEPHFS = (
+    f'{DEFAULT_CLUSTERNAME}-cephfsplugin-snapclass'
+)
+DEFAULT_VOLUMESNAPSHOTCLASS_RBD = f'{DEFAULT_CLUSTERNAME}-rbdplugin-snapclass'
+
 # encoded value of 'admin'
 ADMIN_USER = 'admin'
 GB = 1024 ** 3
@@ -272,8 +280,16 @@ ROOK_CSI_RBD_STORAGECLASS_YAML = os.path.join(
     ROOK_CSI_RBD_DIR, "storageclass.yaml"
 )
 
+CSI_RBD_PVC_CLONE_YAML = os.path.join(
+    TEMPLATE_CSI_RBD_DIR, "pvc-clone.yaml"
+)
+
 CSI_CEPHFS_STORAGECLASS_YAML = os.path.join(
     TEMPLATE_CSI_FS_DIR, "storageclass.yaml"
+)
+
+CSI_CEPHFS_PVC_CLONE_YAML = os.path.join(
+    TEMPLATE_CSI_FS_DIR, "pvc-clone.yaml"
 )
 
 ROOK_CSI_CEPHFS_STORAGECLASS_YAML = os.path.join(
@@ -335,9 +351,34 @@ CSI_CEPHFS_PVC_YAML = os.path.join(
     TEMPLATE_CSI_FS_DIR, "pvc.yaml"
 )
 
+CSI_CEPHFS_PVC_RESTORE_YAML = os.path.join(
+    TEMPLATE_CSI_FS_DIR, "pvc-restore.yaml"
+)
+
+CSI_CEPHFS_SNAPSHOT_YAML = os.path.join(
+    TEMPLATE_CSI_FS_DIR, "snapshot.yaml"
+)
+
+CSI_CEPHFS_SNAPSHOTCLASS_YAML = os.path.join(
+    TEMPLATE_CSI_FS_DIR, "snapshotclass.yaml"
+)
+
 CSI_RBD_PVC_YAML = os.path.join(
     TEMPLATE_CSI_RBD_DIR, "pvc.yaml"
 )
+
+CSI_RBD_PVC_RESTORE_YAML = os.path.join(
+    TEMPLATE_CSI_RBD_DIR, "pvc-restore.yaml"
+)
+
+CSI_RBD_SNAPSHOT_YAML = os.path.join(
+    TEMPLATE_CSI_RBD_DIR, "snapshot.yaml"
+)
+
+CSI_RBD_SNAPSHOTCLASS_YAML = os.path.join(
+    TEMPLATE_CSI_RBD_DIR, "snapshotclass.yaml"
+)
+
 CONFIGURE_PVC_ON_MONITORING_POD = os.path.join(
     TEMPLATE_CONFIGURE_PVC_MONITORING_POD, "configuring_pvc.yaml"
 )
@@ -470,6 +511,10 @@ AWSCLI_SERVICE_CA_YAML = os.path.join(
 
 AWSCLI_POD_YAML = os.path.join(
     TEMPLATE_APP_POD_DIR, "awscli.yaml"
+)
+
+AWSCLI_MULTIARCH_POD_YAML = os.path.join(
+    TEMPLATE_APP_POD_DIR, "awscli_multiarch.yaml"
 )
 
 SERVICE_ACCOUNT_YAML = os.path.join(
@@ -627,6 +672,8 @@ ALERT_CLUSTERCRITICALLYFULL = 'CephClusterCriticallyFull'
 
 # OCS Deployment related constants
 OPERATOR_NODE_LABEL = "cluster.ocs.openshift.io/openshift-storage=''"
+INFRA_NODE_LABEL = "node-role.kubernetes.io/infra=''"
+NODE_SELECTOR_ANNOTATION = "openshift.io/node-selector="
 TOPOLOGY_ROOK_LABEL = "topology.rook.io/rack"
 OPERATOR_NODE_TAINT = "node.ocs.openshift.io/storage=true:NoSchedule"
 OPERATOR_CATALOG_SOURCE_NAME = "ocs-catalogsource"
@@ -676,6 +723,7 @@ VSPHERE_NODE_USER = "core"
 VSPHERE_INSTALLER_BRANCH = "release-4.3"
 VSPHERE_INSTALLER_REPO = "https://github.com/openshift/installer.git"
 VSPHERE_SCALEUP_REPO = "https://code.engineering.redhat.com/gerrit/openshift-misc"
+VSPHERE_CLUSTER_LAUNCHER = "https://gitlab.cee.redhat.com/aosqe/cluster-launcher.git"
 VSPHERE_DIR = os.path.join(EXTERNAL_DIR, "installer/upi/vsphere/")
 INSTALLER_IGNITION = os.path.join(VSPHERE_DIR, "machine/ignition.tf")
 VM_IFCFG = os.path.join(VSPHERE_DIR, "vm/ifcfg.tmpl")
@@ -696,6 +744,14 @@ SCALEUP_VSPHERE_VARIABLES = os.path.join(SCALEUP_VSPHERE_DIR, "variables.tf")
 SCALEUP_VSPHERE_ROUTE53 = os.path.join(SCALEUP_VSPHERE_DIR, "route53/vsphere-rhel-dns.tf")
 SCALEUP_VSPHERE_ROUTE53_VARIABLES = os.path.join(SCALEUP_VSPHERE_DIR, "route53/variables.tf")
 SCALEUP_VSPHERE_MACHINE_CONF = os.path.join(SCALEUP_VSPHERE_DIR, "machines/vsphere-rhel-machine.tf")
+
+# cluster-launcher
+CLUSTER_LAUNCHER_VSPHERE_DIR = os.path.join(
+    EXTERNAL_DIR,
+    "cluster-launcher/v4-scaleup/ocp4-rhel-scaleup/"
+)
+CLUSTER_LAUNCHER_MACHINE_CONF = "vsphere/machines/vsphere-rhel-machine.tf"
+
 TERRAFORM_VARS = "terraform.tfvars"
 VM_DISK_TYPE = "thin"
 VM_DISK_MODE = "persistent"
@@ -721,6 +777,7 @@ RHEL_POD_PACKAGES = ["openssh-clients", "openshift-ansible", "openshift-clients"
 POD_UPLOADPATH = RHEL_TMP_PATH = "/tmp/"
 YUM_REPOS_PATH = "/etc/yum.repos.d/"
 PEM_PATH = "/etc/pki/ca-trust/source/anchors/"
+FIPS_LOCATION = "/proc/sys/crypto/fips_enabled"
 
 # Upgrade related constants, keeping some space between, so we can add
 # additional order.
@@ -742,6 +799,7 @@ LATEST_TAGS = (
     '4.3-rc', 'latest-4.3', 'latest-stable-4.3',
     '4.4-rc', 'latest-4.4', 'latest-stable-4.4',
     '4.5-rc', 'latest-4.5', 'latest-stable-4.5',
+    '4.6-rc', 'latest-4.6', 'latest-stable-4.6',
 )
 INTERNAL_MIRROR_PEM_FILE = "ops-mirror.pem"
 EC2_USER = "ec2-user"
@@ -757,6 +815,9 @@ SUPPORTED_BROWSERS = (CHROME_BROWSER)
 # Inventory
 INVENTORY_TEMPLATE = "inventory.yaml.j2"
 INVENTORY_FILE = "inventory.yaml"
+
+INVENTORY_TEMPLATE_HAPROXY = "inventory_haproxy.yaml.j2"
+INVENTORY_FILE_HAPROXY = "inventory_haproxy.yaml"
 
 # users
 VM_RHEL_USER = "test"
@@ -884,7 +945,6 @@ MUST_GATHER_COMMANDS = [
     'ceph_osd_crush_show-tunables', 'ceph_osd_crush_dump', 'ceph_mon_stat',
     'ceph_mon_dump', 'ceph_mgr_dump', 'ceph_mds_stat', 'ceph_health_detail',
     'ceph_fs_ls', 'ceph_fs_dump', 'ceph_df', 'ceph_auth_list',
-    'ceph-volume_lvm_list'
 ]
 
 MUST_GATHER_COMMANDS_JSON = [
@@ -947,7 +1007,7 @@ FLEXY_MNT_CONTAINER_DIR = '/mnt'
 FLEXY_HOST_DIR = 'flexy-dir'
 FLEXY_HOST_DIR_PATH = os.path.join(DATA_DIR, FLEXY_HOST_DIR)
 FLEXY_DEFAULT_ENV_FILE = "ocs-osp.env"
-OPENSHIFT_MISC_BASE = "private-openshift-misc/v3-launch-templates/functionality-testing"
+OPENSHIFT_MISC_BASE = "private-openshift-misc/functionality-testing"
 FLEXY_BAREMETAL_UPI_TEMPLATE = "upi-on-baremetal/versioned-installer-openstack"
 FLEXY_GIT_CRYPT_KEYFILE = os.path.join(DATA_DIR, "git-crypt-keyfile")
 NTP_CHRONY_CONF = os.path.join(
@@ -960,6 +1020,10 @@ FLEXY_DEFAULT_PRIVATE_CONF_BRANCH = "master"
 OPENSHIFT_CONFIG_NAMESPACE = "openshift-config"
 FLEXY_RELATIVE_CLUSTER_DIR = "flexy/workdir/install-dir"
 FLEXY_IMAGE_URL = "docker-registry.upshift.redhat.com/aosqe/flexy:poc"
+FLEXY_ENV_FILE_UPDATED = os.path.join(
+    FLEXY_HOST_DIR_PATH, 'ocs-flexy-env-file-updated.env'
+)
+REGISTRY_SVC = "registry.svc.ci.openshift.org/ocp/release"
 
 # PSI-openstack constants
 NOVA_CLNT_VERSION = "2.0"
@@ -1024,6 +1088,7 @@ FILE_PATH = '/tmp/ceph.tar.gz'
 BOOTSTRAP_MODULE = "module.ipam_bootstrap"
 LOAD_BALANCER_MODULE = "module.ipam_lb"
 COMPUTE_MODULE = "module.ipam_compute"
+CONTROL_PLANE = "module.ipam_control_plane"
 
 # proxy location
 HAPROXY_LOCATION = "/etc/haproxy/haproxy.conf"
@@ -1073,6 +1138,9 @@ PXE_FILE = os.path.join(
 )
 coreos_url_prefix = "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos"
 BM_DEFAULT_CLUSTER_NAME = "ocp-baremetal-auto"
+BM_STATUS_ABSENT = "ABSENT"
+BM_STATUS_PRESENT = "PRESENT"
+BM_STATUS_RESPONSE_UPDATED = "UPDATED"
 
 # MCG namespace constants
 MCG_NS_AWS_ENDPOINT = 'https://s3.amazonaws.com'

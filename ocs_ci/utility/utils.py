@@ -20,11 +20,12 @@ from shutil import which, move, rmtree
 import hcl
 import requests
 import yaml
+import git
 from bs4 import BeautifulSoup
 from paramiko import SSHClient, AutoAddPolicy
 from paramiko.auth_handler import AuthenticationException, SSHException
 from semantic_version import Version
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, mkdtemp
 
 from ocs_ci.framework import config
 from ocs_ci.ocs import constants, defaults
@@ -2449,6 +2450,21 @@ def set_aws_region(region=None):
     os.environ['AWS_REGION'] = region
 
 
+def get_system_architecture():
+    """
+    Get output from 'uname -m' command run on first worker node.
+
+    Returns:
+        str: Architecture of system
+
+    """
+    from ocs_ci.ocs.node import get_typed_nodes
+
+    log.info('Checking architecture of system')
+    node = get_typed_nodes(node_type=constants.WORKER_MACHINE)[0]
+    return node.ocp.exec_oc_debug_cmd(node.data['metadata']['name'], ['uname -m'])
+
+
 def wait_for_machineconfigpool_status(node_type, timeout=900):
     """
     Check for Machineconfigpool status
@@ -2559,3 +2575,70 @@ def check_for_rhcos_images(url):
     """
     r = requests.head(url)
     return r.status_code == requests.codes.ok
+
+
+def download_file_from_git_repo(git_repo_url, path_to_file_in_git, filename):
+    """
+    Download a file from a specified git repository
+
+    Args:
+        git_repo_url (str): The git repository url
+        path_to_file_in_git (str): Path to the file to download
+            in git repository
+        filename (str): Name of the file to write the download to
+
+    """
+    log.debug(
+        f"Download file '{path_to_file_in_git}' from "
+        f"git repository {git_repo_url} to local file '{filename}'."
+    )
+    temp_dir = mkdtemp()
+    git.Repo.clone_from(git_repo_url, temp_dir, branch='master', depth=1)
+    move(os.path.join(temp_dir, path_to_file_in_git), filename)
+    rmtree(temp_dir)
+
+
+def skipif_upgraded_from(version_list):
+    """
+    This function evaluates the condition to skip a test if the cluster
+    is upgraded from a particular OCS version
+
+    Args:
+        version_list (list): List of versions to check
+
+    Return:
+        (bool): True if test needs to be skipped else False
+
+    """
+    try:
+        from ocs_ci.ocs.resources.ocs import get_ocs_csv
+        skip_this = False
+        version_list = [version_list] if isinstance(version_list, str) else version_list
+        ocs_csv = get_ocs_csv()
+        csv_info = ocs_csv.get()
+        prev_version = csv_info.get('spec').get('replaces', '')
+        for version in version_list:
+            if f'.v{version}' in prev_version:
+                skip_this = True
+                break
+        return skip_this
+    except Exception as err:
+        log.error(str(err))
+        return False
+
+
+def get_cluster_id(cluster_path):
+    """
+    Get ClusterID from metadata.json in given cluster_path
+
+    Args:
+        cluster_path: path to cluster install directory
+
+    Returns:
+        str: metadata.json['clusterID']
+
+    """
+    metadata_file = os.path.join(cluster_path, "metadata.json")
+    with open(metadata_file) as f:
+        metadata = json.load(f)
+    return metadata["clusterID"]
