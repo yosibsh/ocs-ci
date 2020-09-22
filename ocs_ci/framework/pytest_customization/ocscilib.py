@@ -85,6 +85,13 @@ def pytest_addoption(parser):
         help="Email ID to send results",
     )
     parser.addoption(
+        '--squad-analysis',
+        dest='squad_analysis',
+        action="store_true",
+        default=False,
+        help="Include Squad Analysis to email report.",
+    )
+    parser.addoption(
         '--collect-logs',
         dest='collect-logs',
         action="store_true",
@@ -383,6 +390,7 @@ def process_cluster_cli_params(config):
             raise ClusterNameNotProvidedError()
     if get_cli_param(config, 'email') and not get_cli_param(config, '--html'):
         pytest.exit("--html option must be provided to send email reports")
+    get_cli_param(config, 'squad_analysis')
     get_cli_param(config, '-m')
     osd_size = get_cli_param(config, '--osd-size')
     if osd_size:
@@ -397,7 +405,7 @@ def process_cluster_cli_params(config):
     ocp_installer_version = get_cli_param(config, '--ocp-installer-version')
     if ocp_installer_version:
         ocsci_config.DEPLOYMENT['installer_version'] = ocp_installer_version
-        ocsci_config.RUN['client_verison'] = ocp_installer_version
+        ocsci_config.RUN['client_version'] = ocp_installer_version
     csv_change = get_cli_param(config, '--csv-change')
     if csv_change:
         csv_change = csv_change.split("::")
@@ -436,7 +444,10 @@ def pytest_runtest_makereport(item, call):
         ocp_logs_collection = True if rep.when == "call" else False
         mcg = True if any(x in item.location[0] for x in ['mcg', 'ecosystem']) else False
         try:
-            collect_ocs_logs(dir_name=test_case_name, ocp=ocp_logs_collection, mcg=mcg)
+            if not ocsci_config.RUN.get('is_ocp_deployment_failed'):
+                collect_ocs_logs(
+                    dir_name=test_case_name, ocp=ocp_logs_collection, mcg=mcg
+                )
         except Exception:
             log.exception("Failed to collect OCS logs")
 

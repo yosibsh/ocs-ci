@@ -56,6 +56,7 @@ from ocs_ci.ocs.cluster_load import ClusterLoad, wrap_msg
 from ocs_ci.utility import aws
 from ocs_ci.utility import deployment_openshift_logging as ocp_logging_obj
 from ocs_ci.utility import templating
+from ocs_ci.utility import users
 from ocs_ci.utility.environment_check import (
     get_status_before_execution, get_status_after_execution
 )
@@ -101,7 +102,7 @@ def pytest_logger_config(logger_config):
     logger_config.set_formatter_class(OCSLogFormatter)
 
 
-def pytest_collection_modifyitems(session, config, items):
+def pytest_collection_modifyitems(session, items):
     """
     A pytest hook to filter out skipped tests satisfying
     skipif_ocs_version or skipif_upgraded_from
@@ -112,31 +113,34 @@ def pytest_collection_modifyitems(session, config, items):
         items: list of collected tests
 
     """
-    for item in items[:]:
-        skipif_ocs_version_marker = item.get_closest_marker(
-            "skipif_ocs_version"
-        )
-        skipif_upgraded_from_marker = item.get_closest_marker(
-            "skipif_upgraded_from"
-        )
-        if skipif_ocs_version_marker:
-            skip_condition = skipif_ocs_version_marker.args
-            # skip_condition will be a tuple
-            # and condition will be first element in the tuple
-            if skipif_ocs_version(skip_condition[0]):
-                log.info(
-                    f'Test: {item} will be skipped due to {skip_condition}'
-                )
-                items.remove(item)
-                continue
-        if skipif_upgraded_from_marker:
-            skip_args = skipif_upgraded_from_marker.args
-            if skipif_upgraded_from(skip_args[0]):
-                log.info(
-                    f'Test: {item} will be skipped because the OCS cluster is'
-                    f' upgraded from one of these versions: {skip_args[0]}'
-                )
-                items.remove(item)
+    teardown = config.RUN['cli_params'].get('teardown')
+    deploy = config.RUN['cli_params'].get('deploy')
+    if not (teardown or deploy):
+        for item in items[:]:
+            skipif_ocs_version_marker = item.get_closest_marker(
+                "skipif_ocs_version"
+            )
+            skipif_upgraded_from_marker = item.get_closest_marker(
+                "skipif_upgraded_from"
+            )
+            if skipif_ocs_version_marker:
+                skip_condition = skipif_ocs_version_marker.args
+                # skip_condition will be a tuple
+                # and condition will be first element in the tuple
+                if skipif_ocs_version(skip_condition[0]):
+                    log.info(
+                        f'Test: {item} will be skipped due to {skip_condition}'
+                    )
+                    items.remove(item)
+                    continue
+            if skipif_upgraded_from_marker:
+                skip_args = skipif_upgraded_from_marker.args
+                if skipif_upgraded_from(skip_args[0]):
+                    log.info(
+                        f'Test: {item} will be skipped because the OCS cluster is'
+                        f' upgraded from one of these versions: {skip_args[0]}'
+                    )
+                    items.remove(item)
 
 
 @pytest.fixture()
@@ -1180,8 +1184,11 @@ def cluster_load(
                         if config.RUN['load_status'] == 'running':
                             cl_load_obj.adjust_load_if_needed()
                         elif config.RUN['load_status'] == 'to_be_paused':
-                            cl_load_obj.pause_load()
+                            cl_load_obj.reduce_load(pause=True)
                             config.RUN['load_status'] = 'paused'
+                        elif config.RUN['load_status'] == 'to_be_reduced':
+                            cl_load_obj.reduce_load(pause=False)
+                            config.RUN['load_status'] = 'reduced'
                         elif config.RUN['load_status'] == 'to_be_resumed':
                             cl_load_obj.resume_load()
                             config.RUN['load_status'] = 'running'
@@ -1195,10 +1202,9 @@ def cluster_load(
         thread.start()
 
 
-@pytest.fixture()
-def pause_cluster_load(request):
+def reduce_cluster_load_implementation(request, pause):
     """
-    Pause the background cluster load
+    Pause/reduce the background cluster load
 
     """
     if config.RUN.get('io_in_bg'):
@@ -1210,20 +1216,38 @@ def pause_cluster_load(request):
             """
             config.RUN['load_status'] = 'to_be_resumed'
             try:
-                for load_status in TimeoutSampler(180, 3, config.RUN.get, 'load_status'):
+                for load_status in TimeoutSampler(300, 3, config.RUN.get, 'load_status'):
                     if load_status == 'running':
                         break
             except TimeoutExpiredError:
                 log.error("Cluster load was not resumed successfully")
         request.addfinalizer(finalizer)
 
-        config.RUN['load_status'] = 'to_be_paused'
+        config.RUN['load_status'] = 'to_be_paused' if pause else 'to_be_reduced'
         try:
-            for load_status in TimeoutSampler(180, 3, config.RUN.get, 'load_status'):
-                if load_status == 'paused':
+            for load_status in TimeoutSampler(300, 3, config.RUN.get, 'load_status'):
+                if load_status in ['paused', 'reduced']:
                     break
         except TimeoutExpiredError:
-            log.error("Cluster load was not paused successfully")
+            log.error(f"Cluster load was not {'paused' if pause else 'reduced'} successfully")
+
+
+@pytest.fixture()
+def pause_cluster_load(request):
+    """
+    Pause the background cluster load
+
+    """
+    reduce_cluster_load_implementation(request=request, pause=True)
+
+
+@pytest.fixture()
+def reduce_cluster_load(request):
+    """
+    Reduce the background cluster load to be 50% of what it is
+
+    """
+    reduce_cluster_load_implementation(request=request, pause=False)
 
 
 @pytest.fixture(
@@ -2577,6 +2601,72 @@ def multi_dc_pod(multi_pvc_factory, dc_pod_factory, service_account_factory):
     return factory
 
 
+@pytest.fixture(scope='session')
+def htpasswd_path(tmpdir_factory):
+    """
+    Returns:
+        string: Path to HTPasswd file with additional usernames
+
+    """
+    return str(tmpdir_factory.mktemp('idp_data').join('users.htpasswd'))
+
+
+@pytest.fixture(scope='session')
+def htpasswd_identity_provider(request):
+    """
+    Creates HTPasswd Identity provider.
+
+    Returns:
+        object: OCS object representing OCP OAuth object with HTPasswd IdP
+
+    """
+    users.create_htpasswd_idp()
+    cluster = OCS(
+        kind=constants.OAUTH,
+        metadata={'name': 'cluster'}
+    )
+    cluster.reload()
+
+    def finalizer():
+        """
+        Remove HTPasswd IdP
+
+        """
+        # TODO(fbalak): remove HTPasswd identityProvider
+        # cluster.ocp.patch(
+        #     resource_name='cluster',
+        #     params=f'[{ "op": "remove", "path": "/spec/identityProviders" }]'
+        # )
+        # users.delete_htpasswd_secret()
+
+    request.addfinalizer(finalizer)
+    return cluster
+
+
+@pytest.fixture(scope='function')
+def user_factory(
+    request,
+    htpasswd_identity_provider,
+    htpasswd_path
+):
+    return users.user_factory(
+        request,
+        htpasswd_path
+    )
+
+
+@pytest.fixture(scope='session')
+def user_factory_session(
+    request,
+    htpasswd_identity_provider,
+    htpasswd_path
+):
+    return users.user_factory(
+        request,
+        htpasswd_path
+    )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def ceph_toolbox(request):
     """
@@ -2610,6 +2700,7 @@ def node_drain_teardown(request):
         ]
         if scheduling_disabled_nodes:
             schedule_nodes(scheduling_disabled_nodes)
+        ceph_health_check()
 
     request.addfinalizer(finalizer)
 
