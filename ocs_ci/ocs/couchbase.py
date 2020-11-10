@@ -157,7 +157,7 @@ class CouchBase(PillowFight):
         self.cb_worker = OCS(**cb_work)
         self.cb_worker.create()
 
-    def create_couchbase_worker(self, replicas=1):
+    def create_couchbase_worker(self, replicas=1, new_sc=None):
         """
         Deploy a Couchbase server and pillowfight workload using operator
 
@@ -181,6 +181,8 @@ class CouchBase(PillowFight):
         logging.info('Creating pods..')
         cb_example = templating.load_yaml(constants.COUCHBASE_WORKER_EXAMPLE)
         cb_example['spec']['servers'][0]['size'] = replicas
+        if new_sc:
+            cb_example['spec']['volumeClaimTemplates'][0]['spec']['storageClassName'] = new_sc
         self.cb_examples = OCS(**cb_example)
         self.cb_examples.create()
 
