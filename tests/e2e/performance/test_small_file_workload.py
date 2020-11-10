@@ -348,25 +348,9 @@ class TestSmallFileWorkload(E2ETest):
         argnames=["file_size", "files", "threads", "samples", "interface"],
         argvalues=[
             pytest.param(
-                *[4, 50000, 4, 3, constants.CEPHBLOCKPOOL],
-                marks=pytest.mark.polarion_id("OCS-1295"),
-            ),
-            pytest.param(
-                *[16, 50000, 4, 3, constants.CEPHBLOCKPOOL],
-                marks=pytest.mark.polarion_id("OCS-2020"),
-            ),
-            pytest.param(
-                *[16, 200000, 4, 3, constants.CEPHBLOCKPOOL],
-                marks=pytest.mark.polarion_id("OCS-2021"),
-            ),
-            pytest.param(
-                *[4, 50000, 4, 3, constants.CEPHFILESYSTEM],
+                *[4, 1000000, 4, 3, constants.CEPHFILESYSTEM],
                 marks=pytest.mark.polarion_id("OCS-2022"),
-            ),
-            pytest.param(
-                *[16, 50000, 4, 3, constants.CEPHFILESYSTEM],
-                marks=pytest.mark.polarion_id("OCS-2023"),
-            ),
+            )
         ]
     )
     @pytest.mark.polarion_id("OCS-1295")
@@ -451,7 +435,7 @@ class TestSmallFileWorkload(E2ETest):
             condition=constants.STATUS_RUNNING,
             resource_name=small_file_client_pod,
             sleep=30,
-            timeout=600
+            timeout=12000
         )
         # Getting the start time of the test
         start_time = time.strftime('%Y-%m-%dT%H:%M:%SGMT', time.gmtime())
@@ -459,7 +443,7 @@ class TestSmallFileWorkload(E2ETest):
         test_start_time = time.time()
 
         # After testing manually, changing the timeout
-        timeout = 3600
+        timeout = 45000
 
         # Getting the UUID from inside the benchmark pod
         uuid = ripsaw.get_uuid(small_file_client_pod)
