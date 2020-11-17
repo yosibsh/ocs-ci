@@ -672,6 +672,7 @@ ORDER_AFTER_UPGRADE = 80
 
 # Deployment constants
 OCS_CSV_PREFIX = "ocs-operator"
+LOCAL_STORAGE_SUBSCRIPTION = "local-storage-operator"
 LOCAL_STORAGE_CSV_PREFIX = "local-storage-operator"
 LATEST_TAGS = (
     "latest",
