@@ -140,6 +140,7 @@ class IBMDeployment(Deployment):
             "backingstores.noobaa.io",
             "bucketclasses.noobaa.io",
             "cephblockpools.ceph.rook.io",
+            "cephclients.ceph.rook.io",
             "cephclusters.ceph.rook.io",
             "cephfilesystems.ceph.rook.io",
             "cephnfses.ceph.rook.io",
@@ -149,7 +150,6 @@ class IBMDeployment(Deployment):
             "ocsinitializations.ocs.openshift.io",
             "storageclusterinitializations.ocs.openshift.io",
             "storageclusters.ocs.openshift.io",
-            "cephclients.ceph.rook.io",
         ]
         cr_patch = json.dumps(dict(finalizers=None))
         crd_patch = json.dumps(dict(metadata=dict(finalizers=None)))
