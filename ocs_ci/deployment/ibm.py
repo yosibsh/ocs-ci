@@ -60,6 +60,53 @@ class IBMDeployment(Deployment):
         # Section 3.3 Step 2
         pvc.delete_pvcs(cephfs_pvcs)
 
+        # Section 3.1 Step 3
+        try:
+            ocp.OCP().exec_oc_cmd(
+                f"delete -n {cluster_namespace} storagecluster --all --wait=true"
+            )
+        except (CommandFailed, subprocess.TimeoutExpired):
+            pass
+
+        # Section 3.1 Step 4
+        ocp.OCP().exec_oc_cmd("project default")
+        ocp.OCP().exec_oc_cmd(
+            f"delete project {cluster_namespace} --wait=true --timeout=5m"
+        )
+        tried = 0
+        leftovers = True
+        while tried < 5:
+            # We need to loop here until the project can't be found
+            try:
+                ocp.OCP().exec_oc_cmd(
+                    f"get project {cluster_namespace}",
+                    out_yaml_format=False,
+                )
+            except CommandFailed:
+                leftovers = False
+                break
+            time.sleep(60)
+            tried += 1
+        if leftovers:
+            # https://access.redhat.com/documentation/en-us/red_hat_openshift_container_storage/4.5/html/troubleshooting_openshift_container_storage/troubleshooting-and-deleting-remaining-resources-during-uninstall_rhocs
+            leftover_types = [
+                "cephfilesystem.ceph.rook.io",
+                "cephobjectstore.ceph.rook.io",
+                "cephobjectstoreuser.ceph.rook.io",
+                "storagecluster.ocs.openshift.io",
+            ]
+            patch = dict(metadata=dict(finalizers=None))
+            for obj_type in leftover_types:
+                try:
+                    objs = ocp.OCP(kind=obj_type).get()
+                except CommandFailed:
+                    continue
+                for obj in objs["items"]:
+                    name = obj["metadata"]["name"]
+                    ocp.OCP().exec_oc_cmd(
+                        f"oc patch -n {cluster_namespace} {obj_type} {name} --type=merge -p '{json.dumps(patch)}'"
+                    )
+
         # Section 3.1 Step 5
         nodes = ocp.OCP().exec_oc_cmd(
             "get node -l cluster.ocs.openshift.io/openshift-storage= -o yaml"
@@ -119,53 +166,6 @@ class IBMDeployment(Deployment):
             if vsc["driver"].startswith("openshift-storage."):
                 vsc_name = vsc["metadata"]["name"]
                 ocp.OCP().exec_oc_cmd(f"delete volumesnapshotclass {vsc_name}")
-
-        # Section 3.1 Step 3
-        try:
-            ocp.OCP().exec_oc_cmd(
-                f"delete -n {cluster_namespace} storagecluster --all --wait=true"
-            )
-        except (CommandFailed, subprocess.TimeoutExpired):
-            pass
-
-        # Section 3.1 Step 4
-        ocp.OCP().exec_oc_cmd("project default")
-        ocp.OCP().exec_oc_cmd(
-            f"delete project {cluster_namespace} --wait=true --timeout=5m"
-        )
-        tried = 0
-        leftovers = True
-        while tried < 5:
-            # We need to loop here until the project can't be found
-            try:
-                ocp.OCP().exec_oc_cmd(
-                    f"get project {cluster_namespace}",
-                    out_yaml_format=False,
-                )
-            except CommandFailed:
-                leftovers = False
-                break
-            time.sleep(60)
-            tried += 1
-        if leftovers:
-            # https://access.redhat.com/documentation/en-us/red_hat_openshift_container_storage/4.5/html/troubleshooting_openshift_container_storage/troubleshooting-and-deleting-remaining-resources-during-uninstall_rhocs
-            leftover_types = [
-                "cephfilesystem.ceph.rook.io",
-                "cephobjectstore.ceph.rook.io",
-                "cephobjectstoreuser.ceph.rook.io",
-                "storagecluster.ocs.openshift.io",
-            ]
-            patch = dict(metadata=dict(finalizers=None))
-            for obj_type in leftover_types:
-                try:
-                    objs = ocp.OCP(kind=obj_type).get()
-                except CommandFailed:
-                    continue
-                for obj in objs["items"]:
-                    name = obj["metadata"]["name"]
-                    ocp.OCP().exec_oc_cmd(
-                        f"oc patch -n {cluster_namespace} {obj_type} {name} --type=merge -p '{json.dumps(patch)}'"
-                    )
 
         self.destroy_lso()
 
