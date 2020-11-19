@@ -136,6 +136,12 @@ class IBMDeployment(Deployment):
                 ocp.OCP().exec_oc_cmd(f"oc delete pv {pv_name}")
 
         # Section 3.1 Step 9
+        # Note that the below process differs from the documentation slightly.
+        # Instead of deleting all CRDs at once and calling the job done, we
+        # iterate over a list of them, noting which ones don't delete fully and
+        # applying the standard workaround of removing the finalizers from any
+        # CRs and also the CRD. Finally, the documentation leaves out a few
+        # CRDs that we've seen in deployed clusters.
         crd_types = [
             "backingstores.noobaa.io",
             "bucketclasses.noobaa.io",
@@ -144,8 +150,12 @@ class IBMDeployment(Deployment):
             "cephclusters.ceph.rook.io",
             "cephfilesystems.ceph.rook.io",
             "cephnfses.ceph.rook.io",
+            "cephobjectrealms.ceph.rook.io",  # not in doc
             "cephobjectstores.ceph.rook.io",
             "cephobjectstoreusers.ceph.rook.io",
+            "cephobjectzonegroups.ceph.rook.io",  # not in doc
+            "cephobjectzones.ceph.rook.io",  # not in doc
+            "cephrbdmirrors.ceph.rook.io",  # not in doc
             "noobaas.noobaa.io",
             "ocsinitializations.ocs.openshift.io",
             "storageclusterinitializations.ocs.openshift.io",
