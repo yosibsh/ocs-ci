@@ -690,16 +690,16 @@ class Deployment(object):
             condition="Running",
             selector="app=rook-ceph-mon",
             resource_count=3,
-            timeout=600,
+            timeout=300,
         )
         assert pod.wait_for_resource(
-            condition="Running", selector="app=rook-ceph-mgr", timeout=600
+            condition="Running", selector="app=rook-ceph-mgr", timeout=300
         )
         assert pod.wait_for_resource(
             condition="Running",
             selector="app=rook-ceph-osd",
             resource_count=3,
-            timeout=600,
+            timeout=1200,
         )
 
         # validate ceph mon/osd volumes are backed by pvc
