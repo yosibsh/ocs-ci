@@ -826,7 +826,7 @@ class TimeoutSampler(object):
                 logging.error(msg)
             if self.timeout < (time.time() - self.start_time):
                 raise self.timeout_exc_cls(*self.timeout_exc_args)
-            log.info(
+            log.debug(
                 f"Going to sleep for {self.sleep} seconds" " before next iteration"
             )
             time.sleep(self.sleep)
