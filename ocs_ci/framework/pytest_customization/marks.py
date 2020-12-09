@@ -176,7 +176,10 @@ skipif_aws_i3 = pytest.mark.skipif(
 )
 
 skipif_bm = pytest.mark.skipif(
-    config.ENV_DATA["platform"].lower() == "baremetal"
+    (
+        config.ENV_DATA["platform"].lower() == "baremetal"
+        or config.ENV_DATA["platform"].lower() == "powervs"
+    )
     and config.DEPLOYMENT.get("local_storage") is True,
     reason="Test will not run on Bare Metal",
 )

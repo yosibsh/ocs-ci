@@ -13,7 +13,7 @@ from ocs_ci.deployment.terraform import Terraform
 from ocs_ci.deployment.vmware import update_machine_conf
 from ocs_ci.ocs.exceptions import TimeoutExpiredError
 from ocs_ci.framework import config, merge_dict
-from ocs_ci.utility import aws, vsphere, templating, baremetal, azure_utils
+from ocs_ci.utility import aws, vsphere, templating, baremetal, azure_utils, powernodes
 from ocs_ci.utility.retry import retry
 from ocs_ci.utility.csr import approve_pending_csr
 from ocs_ci.ocs import constants, ocp, exceptions
@@ -65,6 +65,7 @@ class PlatformNodesFactory:
             "baremetal": BaremetalNodes,
             "azure": AZURENodes,
             "gcp": NodesBase,
+            "powervs": IBMPowerNodes,
         }
 
     def get_nodes_platform(self):
@@ -1683,6 +1684,67 @@ class BaremetalNodes(NodesBase):
             default_config_dict = yaml.safe_load(f)
 
         return default_config_dict
+
+
+class IBMPowerNodes(NodesBase):
+    """
+    IBM Power Nodes class
+    """
+
+    def __init__(self):
+        super(IBMPowerNodes, self).__init__()
+        self.powernodes = powernodes.POWERNODES()
+
+    def stop_nodes(self, nodes, force=True):
+        """
+        Stop PowerNode
+
+        Args:
+            nodes (list): The OCS objects of the nodes
+            force (bool): True for force nodes stop, False otherwise
+
+        """
+        self.powernodes.stop_powernodes_machines(nodes, force=force)
+
+    def start_nodes(self, nodes, force=True):
+        """
+        Start PowerNode
+
+        Args:
+            nodes (list): The OCS objects of the nodes
+            wait (bool): Wait for node status
+
+        """
+        self.powernodes.start_powernodes_machines(nodes, force=force)
+
+    def restart_nodes(self, nodes, timeout=540, wait=True, force=True):
+        """
+        Restart PowerNode
+
+        Args:
+            nodes (list): The OCS objects of the nodes
+            force (bool): True for force BM stop, False otherwise
+
+        """
+        self.powernodes.restart_powernodes_machines(nodes, force=force)
+
+    def restart_nodes_teardown(self):
+        """
+        Make sure all PowerNodes are up by the end of the test
+
+        """
+        self.cluster_nodes = get_node_objs()
+        stopped_powernodes = [
+            powernode
+            for powernode in self.cluster_nodes
+            if self.powernodes.verify_machine_is_down(powernode) is True
+        ]
+
+        if stopped_powernodes:
+            logger.info(
+                f"The following PowerNodes are powered off: {stopped_powernodes}"
+            )
+            self.powernodes.start_powernodes_machines(stopped_powernodes)
 
 
 class AZURENodes(NodesBase):
