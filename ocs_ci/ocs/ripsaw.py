@@ -41,7 +41,7 @@ class RipSaw(object):
         """
         self.args = kwargs
         self.repo = self.args.get(
-            "repo", "https://github.com/cloud-bulldozer/benchmark-operator"
+            "repo", "https://github.com/ocp-power-automation/benchmark-operator"
         )
         self.branch = self.args.get("branch", "master")
         self.namespace = self.args.get("namespace", RIPSAW_NAMESPACE)

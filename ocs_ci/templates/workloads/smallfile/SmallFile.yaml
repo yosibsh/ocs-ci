@@ -21,6 +21,7 @@ spec:
   workload:
     name: smallfile
     args:
+      image: quay.io/piyushgupta1551/smallfile-m:ppc64le
       clients: 1
       samples: 1
       pause: 50

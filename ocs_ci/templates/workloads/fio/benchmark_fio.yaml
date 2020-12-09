@@ -12,6 +12,7 @@ spec:
   workload:
     name: "fio_distributed"
     args:
+      image: quay.io/piyushgupta1551/fio-m:ppc64le
       prefill: true
       samples: 3
       servers: 50

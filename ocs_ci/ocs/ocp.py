@@ -656,7 +656,7 @@ class OCP(object):
 
         return False
 
-    def wait_for_delete(self, resource_name="", timeout=60, sleep=3):
+    def wait_for_delete(self, resource_name="", timeout=60, sleep=6):
         """
         Wait for a resource to be deleted
 
