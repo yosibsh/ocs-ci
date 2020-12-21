@@ -73,7 +73,7 @@ pipeline {
         script { LAST_STAGE=env.STAGE_NAME }
         sh """
         source ./venv/bin/activate
-        run-ci -m deployment --deploy --ocsci-conf=ocs-ci-ocp.yaml --ocsci-conf=conf/ocsci/production-aws-ipi.yaml --ocsci-conf=conf/ocsci/production_device_size.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --collect-logs
+        run-ci -m deployment --deploy --ocsci-conf=ocs-ci-ocp.yaml --ocsci-conf=conf/ocsci/production-aws-ipi.yaml --ocsci-conf=conf/ocsci/production_device_size.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --collect-logs ${env.PYTEST_ADDOPTS}
         """
       }
     }
@@ -82,7 +82,7 @@ pipeline {
         script { LAST_STAGE=env.STAGE_NAME }
         sh """
         source ./venv/bin/activate
-        run-ci -m deployment --deploy --ocsci-conf=ocs-ci-ocs.yaml --ocsci-conf=conf/ocsci/production-aws-ipi.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --collect-logs
+        run-ci -m deployment --deploy --ocsci-conf=ocs-ci-ocs.yaml --ocsci-conf=conf/ocsci/production-aws-ipi.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --collect-logs ${env.PYTEST_ADDOPTS}
         """
       }
     }
@@ -97,7 +97,7 @@ pipeline {
         script { LAST_STAGE=env.STAGE_NAME }
         sh """
         source ./venv/bin/activate
-        run-ci -m acceptance --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --self-contained-html --html=${env.WORKSPACE}/logs/report.html --junit-xml=${env.WORKSPACE}/logs/junit.xml --collect-logs --bugzilla ${env.EMAIL_ARG}
+        run-ci -m acceptance --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --self-contained-html --html=${env.WORKSPACE}/logs/report.html --junit-xml=${env.WORKSPACE}/logs/junit.xml --collect-logs --bugzilla ${env.EMAIL_ARG} ${env.PYTEST_ADDOPTS}
         """
       }
     }
@@ -112,7 +112,7 @@ pipeline {
       }
       sh """
         source ./venv/bin/activate
-        run-ci -m deployment --teardown --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --collect-logs
+        run-ci -m deployment --teardown --ocsci-conf=ocs-ci-ocs.yaml --cluster-name=${env.CLUSTER_USER}-ocsci-${env.BUILD_ID} --cluster-path=cluster --collect-logs ${env.PYTEST_ADDOPTS}
         """
       junit testResults: "logs/junit.xml", keepLongStdio: false
     }
