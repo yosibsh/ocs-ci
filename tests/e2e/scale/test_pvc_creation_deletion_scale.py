@@ -1,5 +1,6 @@
 """
-Test to measure pvc scale creation & deletion time. Total pvc count would be 1500
+Test to measure pvc scale creation & deletion time. Total pvc count would be
+500 times the number of pvcs
 """
 import logging
 import csv
@@ -8,7 +9,7 @@ import time
 
 from ocs_ci.helpers import helpers
 from ocs_ci.ocs.resources import pvc
-from ocs_ci.ocs import constants, scale_lib
+from ocs_ci.ocs import ocp, constants, scale_lib
 from ocs_ci.utility.utils import ocsci_log_path
 from ocs_ci.framework.testlib import scale, E2ETest, polarion_id
 from ocs_ci.ocs.resources.objectconfigfile import ObjectConfFile
@@ -55,7 +56,7 @@ class TestPVCCreationDeletionScale(E2ETest):
         Measuring PVC creation time while scaling PVC
         Measure PVC deletion time after creation test
         """
-        scale_pvc_count = 1500
+        scale_pvc_count = get_pvc_count()
         log.info(f"Start creating {access_mode}-{interface} {scale_pvc_count} PVC")
         if interface == constants.CEPHBLOCKPOOL:
             sc_name = constants.DEFAULT_STORAGECLASS_RBD
@@ -158,11 +159,12 @@ class TestPVCCreationDeletionScale(E2ETest):
     @pytest.mark.usefixtures(namespace.__name__)
     def test_all_4_type_pvc_creation_deletion_scale(self, namespace, tmp_path):
         """
-        Measuring PVC creation time while scaling PVC of all 4 types, Total 1500 PVCs
+        Measuring PVC creation time while scaling PVC of all 4 types,
+        A total of 500 times the number of pvcs
         will be created, i.e. 375 each pvc type
         Measure PVC deletion time in scale env
         """
-        scale_pvc_count = 1500
+        scale_pvc_count = get_pvc_count()
         log.info(f"Start creating {scale_pvc_count} PVC of all 4 types")
         cephfs_sc_obj = constants.DEFAULT_STORAGECLASS_CEPHFS
         rbd_sc_obj = constants.DEFAULT_STORAGECLASS_RBD
@@ -277,3 +279,12 @@ class TestPVCCreationDeletionScale(E2ETest):
             for k, v in fs_pvc_deletion_time.items():
                 csv_obj.writerow([k, v])
         logging.info(f"Delete data present in {log_path}-deletion-time.csv file")
+
+
+def get_pvc_count():
+    ocp_info = ocp.OCP().exec_oc_cmd("get nodes -o json")
+    count = 0
+    for node_chk in ocp_info["items"]:
+        if "node-role.kubernetes.io/worker" in node_chk["metadata"]["labels"]:
+            count += 1
+    return count * 500
