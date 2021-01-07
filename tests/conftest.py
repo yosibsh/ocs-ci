@@ -1975,6 +1975,7 @@ def bucket_factory_fixture(
                 buckets
 
         """
+        current_call_created_buckets = []
         if interface.lower() not in BUCKET_MAP:
             raise RuntimeError(
                 f"Invalid interface type received: {interface}. "
@@ -1997,11 +1998,12 @@ def bucket_factory_fixture(
                 *args,
                 **kwargs,
             )
+            current_call_created_buckets.append(created_bucket)
             created_buckets.append(created_bucket)
             if verify_health:
                 created_bucket.verify_health()
 
-        return created_buckets
+        return current_call_created_buckets
 
     def bucket_cleanup():
         for bucket in created_buckets:
